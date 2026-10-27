@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>QAISXEN</title>
+  <link rel="icon" href="logo-app.svg" type="image/svg+xml" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+
+  <div class="app">
+    <aside class="side" id="side">
+      <div class="brand">
+        <img src="logo-app.svg" width="40" height="40" alt="" />
+        <div>
+          <strong>QAISXEN</strong>
+        </div>
+      </div>
+      <button class="btn-new" onclick="newChat()">+ جديد</button>
+      <nav class="nav">
+        <button class="nav-item active" data-tab="chat" onclick="switchTab('chat')">محادثة</button>
+        <button class="nav-item" data-tab="image" onclick="switchTab('image')">توليد صورة</button>
+        <button class="nav-item" data-tab="webimg" onclick="switchTab('webimg')">صور من النت</button>
+        <button class="nav-item" data-tab="video" onclick="switchTab('video')">فيديو</button>
+        <button class="nav-item" data-tab="call" onclick="switchTab('call')">مكالمة</button>
+      </nav>
+      <div class="hist-title">السجل</div>
+      <div class="hist" id="hist"></div>
+      <div class="side-user" id="sideUser">
+        <button class="btn-ghost" onclick="showAuth()">تسجيل الدخول</button>
+      </div>
+      <button class="btn-ghost" onclick="clearHistory()">مسح السجل</button>
+    </aside>
+
+    <div class="scrim" id="scrim" onclick="closeSide()"></div>
+
+    <main class="main">
+      <header class="top">
+        <button class="icon-btn menu" onclick="openSide()">☰</button>
+        <div class="top-title">
+          <img src="logo-app.svg" width="28" height="28" alt="" />
+          <span id="topLabel">محادثة</span>
+          <em id="status">جاهز</em>
+        </div>
+        <button class="icon-btn" onclick="toggleTheme()">◐</button>
+      </header>
+
+      <section class="panel active" id="panel-chat">
+        <div class="messages" id="messages"></div>
+        <div class="composer-wrap">
+          <div class="composer">
+            <label class="icon-btn attach" title="رفع">
+              📎
+              <input type="file" id="fileInput" accept="image/*" hidden onchange="handleUpload(event)" />
+            </label>
+            <textarea id="input" rows="1" placeholder="اكتب رسالتك..." onkeydown="onKey(event)"></textarea>
+            <button class="send" id="sendBtn" onclick="onSend()">➤</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-image">
+        <div class="studio">
+          <div class="studio-head">
+            <h1>توليد صورة</h1>
+            <p>أنشئ صورة بالذكاء الاصطناعي من وصفك</p>
+          </div>
+          <textarea id="imgPrompt" rows="4" placeholder="وصف الصورة..."></textarea>
+          <button class="btn-primary" onclick="makeImage()">إنشاء</button>
+          <div id="imgOut" class="out"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-webimg">
+        <div class="studio">
+          <div class="studio-head">
+            <h1>صور من النت</h1>
+            <p>بحث عن صور حقيقية</p>
+          </div>
+          <div class="web-search-row">
+            <input id="webImgQ" type="text" placeholder="مثال: قط، سيارة، بحر..." onkeydown="if(event.key==='Enter')searchWebImgUI()" />
+            <button class="btn-primary" onclick="searchWebImgUI()">بحث</button>
+          </div>
+          <div id="webImgOut" class="out img-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-video">
+        <div class="studio">
+          <div class="studio-head">
+            <h1>فيديو</h1>
+            <p>وصف المشهد</p>
+          </div>
+          <textarea id="vidPrompt" rows="4" placeholder="وصف المشهد..."></textarea>
+          <button class="btn-primary" onclick="makeVideo()">إنشاء</button>
+          <div id="vidOut" class="out"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-call">
+        <div class="call-stage">
+          <div class="call-ring" id="callRing"><img src="logo-app.svg" alt="" /></div>
+          <h2>مكالمة</h2>
+          <p id="callStatus">اضغط بدء ثم تكلم</p>
+          <div class="call-actions">
+            <button class="btn-primary" id="callBtn" onclick="toggleCall()">بدء</button>
+            <button class="btn-ghost" id="endBtn" hidden onclick="endCall()">إنهاء</button>
+          </div>
+          <div class="call-log" id="callLog"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="auth-modal" id="authModal" hidden>
+    <div class="auth-card">
+      <img src="logo-app.svg" width="48" height="48" alt="" />
+      <h2>تسجيل الدخول</h2>
+      <div id="googleBtnWrap" class="google-wrap"></div>
+      <div class="or-line"><span>أو</span></div>
+      <input type="email" id="authEmail" placeholder="البريد" />
+      <input type="password" id="authPass" placeholder="كلمة المرور" />
+      <div class="auth-actions">
+        <button class="btn-primary" onclick="authLogin()">دخول</button>
+        <button class="btn-ghost" onclick="authSignup()">إنشاء</button>
+      </div>
+      <button class="linkish" onclick="hideAuth()">لاحقاً</button>
+      <p class="auth-err" id="authErr" hidden></p>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
