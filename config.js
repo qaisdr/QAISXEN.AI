@@ -3,12 +3,12 @@ window.QAISXEN_CONFIG = {
   CREATOR: 'قيس',
 
   // الشات
-  GROQ_API_KEY: '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',
+  GROQ_API_KEY:' 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',
 
   // صور AI (اختياري)
   HF_TOKEN: '',
 // Google Sign-In (اختياري) من Google Cloud Console → OAuth Web Client ID
-  GOOGLE_CLIENT_ID: AIzaSyAPr-NyiR8_og8qBmk3CbqkdEvAC2PMMrU
+  GOOGLE_CLIENT_ID:' AIzaSyAPr-NyiR8_og8qBmk3CbqkdEvAC2PMMrU',
 
   // سحابة (اختياري)
   SUPABASE_URL: 'https://jcorezrkteubzmzmosbj.supabase.co',
