@@ -1,0 +1,13 @@
+{
+  "name": "QAISXEN",
+  "short_name": "QAISXEN",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#05080F",
+  "theme_color": "#05080F",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "logo-app.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

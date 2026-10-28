@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>QAISXEN</title>
   <link rel="icon" href="logo-app.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#05080F" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -22,6 +25,7 @@
         <img src="logo-app.svg" width="40" height="40" alt="" />
         <div>
           <strong>QAISXEN</strong>
+          <small>by قيس</small>
         </div>
       </div>
       <button class="btn-new" onclick="newChat()">+ جديد</button>
@@ -31,6 +35,7 @@
         <button class="nav-item" data-tab="webimg" onclick="switchTab('webimg')">صور من النت</button>
         <button class="nav-item" data-tab="video" onclick="switchTab('video')">فيديو</button>
         <button class="nav-item" data-tab="call" onclick="switchTab('call')">مكالمة</button>
+        <button class="nav-item" data-tab="settings" onclick="switchTab('settings')">إعدادات</button>
       </nav>
       <div class="hist-title">السجل</div>
       <div class="hist" id="hist"></div>
@@ -105,6 +110,33 @@
         </div>
       </section>
 
+      <section class="panel" id="panel-settings">
+        <div class="studio">
+          <div class="studio-head">
+            <h1>إعدادات</h1>
+            <p>خصص أسلوب QAISXEN</p>
+          </div>
+          <label class="set-label">أسلوب الرد</label>
+          <select id="setMode" class="set-input" onchange="saveSettings()">
+            <option value="default">عادي</option>
+            <option value="teacher">مدرس</option>
+            <option value="dev">مبرمج</option>
+            <option value="writer">كاتب</option>
+            <option value="short">مختصر</option>
+          </select>
+          <label class="set-label">طول الرد</label>
+          <select id="setLength" class="set-input" onchange="saveSettings()">
+            <option value="auto">تلقائي</option>
+            <option value="short">قصير</option>
+            <option value="long">مفصل</option>
+          </select>
+          <label class="set-label">المفضلة</label>
+          <div id="favList" class="fav-list"></div>
+          <button class="btn-ghost" onclick="clearFavs()">مسح المفضلة</button>
+          <p class="set-hint" id="statsLine">—</p>
+        </div>
+      </section>
+
       <section class="panel" id="panel-call">
         <div class="call-stage">
           <div class="call-ring" id="callRing"><img src="logo-app.svg" alt="" /></div>
@@ -139,5 +171,10 @@
 
   <script src="config.js"></script>
   <script src="script.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

@@ -1,5 +1,71 @@
 /* QAISXEN — full clean build */
 const C = () => window.QAISXEN_CONFIG || {};
+
+function loadSettings() {
+  try {
+    return Object.assign({ mode: 'default', length: 'auto' }, JSON.parse(localStorage.getItem('qx-set') || '{}'));
+  } catch { return { mode: 'default', length: 'auto' }; }
+}
+function saveSettings() {
+  const mode = document.getElementById('setMode')?.value || 'default';
+  const length = document.getElementById('setLength')?.value || 'auto';
+  localStorage.setItem('qx-set', JSON.stringify({ mode, length }));
+  bumpStat('settings');
+  renderFavs();
+  updateStatsLine();
+}
+function applySettingsUI() {
+  const s = loadSettings();
+  const m = document.getElementById('setMode');
+  const l = document.getElementById('setLength');
+  if (m) m.value = s.mode || 'default';
+  if (l) l.value = s.length || 'auto';
+  renderFavs();
+  updateStatsLine();
+}
+function bumpStat(key) {
+  try {
+    const st = JSON.parse(localStorage.getItem('qx-stats') || '{}');
+    st[key] = (st[key] || 0) + 1;
+    st.msgs = st.msgs || 0;
+    localStorage.setItem('qx-stats', JSON.stringify(st));
+  } catch {}
+}
+function updateStatsLine() {
+  const el = document.getElementById('statsLine');
+  if (!el) return;
+  try {
+    const st = JSON.parse(localStorage.getItem('qx-stats') || '{}');
+    el.textContent = 'إحصائيات هذا الجهاز: ' + (st.msgs || 0) + ' رسالة · ' + (st.calls || 0) + ' مكالمة · ' + (st.imgs || 0) + ' صورة';
+  } catch { el.textContent = ''; }
+}
+function getFavs() {
+  try { return JSON.parse(localStorage.getItem('qx-favs') || '[]'); } catch { return []; }
+}
+function addFav(text) {
+  const list = getFavs();
+  list.unshift({ t: String(text).slice(0, 500), at: Date.now() });
+  localStorage.setItem('qx-favs', JSON.stringify(list.slice(0, 30)));
+  renderFavs();
+}
+function clearFavs() {
+  localStorage.removeItem('qx-favs');
+  renderFavs();
+}
+function renderFavs() {
+  const box = document.getElementById('favList');
+  if (!box) return;
+  const list = getFavs();
+  if (!list.length) {
+    box.innerHTML = '<div style="color:var(--faint);font-size:12px">لا مفضلة بعد</div>';
+    return;
+  }
+  box.innerHTML = list.map((f, i) =>
+    '<div class="fav-item" onclick=\'navigator.clipboard.writeText(' + JSON.stringify(f.t) + ')\'>' +
+    escapeHtml(f.t.slice(0, 140)) + (f.t.length > 140 ? '…' : '') + '</div>'
+  ).join('');
+}
+
 const $ = (id) => document.getElementById(id);
 
 const messagesEl = $('messages');
@@ -14,6 +80,7 @@ let db = null;
 let currentUser = null;
 let callActive = false;
 let callRecognition = null;
+let callHistory = [];
 
 function setStatus(t) {
   const el = $('status');
@@ -32,19 +99,61 @@ function format(text) {
   let h = escapeHtml(text);
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // خطوات مرقمة
+  h = h.replace(/^(?:\s*)(\d+)[\.)]\s+(.+)$/gm, '<div class="step"><span>$1</span>$2</div>');
+  // نقاط
+  h = h.replace(/^(?:\s*)[-•]\s+(.+)$/gm, '<div class="bullet">$1</div>');
   h = h.replace(/\n/g, '<br>');
   return h;
 }
 
-function systemPrompt(extra = '') {
+function systemPrompt(extra = '', { voice = false } = {}) {
   const creator = C().CREATOR || 'قيس';
-  return `أنت QAISXEN — مساعد عربي يجيب على أي سؤال مفيد.
-- اسمك QAISXEN. صانعك: ${creator}.
-- إذا سُئلت من أنت: ابدأ بـ «أنا QAISXEN» واذكر أن ${creator} صمّمك.
-- أجب بوضوح ومباشرة. لا ترفض الأسئلة العامة.
-- لا تقل إنك لا تستطيع عرض صور.
-- إذا وُجدت معلومات من الويب فاعتمد عليها.
-- عربية مبسطة.
+  if (voice) {
+    return `أنت QAISXEN في مكالمة صوتية مباشرة.
+صانعك: ${creator}.
+- رد كإنسان على الهاتف: طبيعي ومختصر (1–4 جمل).
+- لا تعداد طويل ولا Markdown.
+- لا حشو مثل «بالتأكيد» أو «سؤال رائع».
+- اسأل سؤالاً واحداً فقط إذا لزم.
+- إذا سُئلت من أنت: «أنا QAISXEN، مساعد صمّمه ${creator}».
+${extra}`;
+  }
+  const s = loadSettings();
+  let style = '';
+  if (s.mode === 'teacher') style += '\nالأسلوب: مدرس صبور. اشرح بالتدريج مع مثال بسيط.';
+  if (s.mode === 'dev') style += '\nالأسلوب: مبرمج خبير. أعطِ كوداً عملياً واشرح باختصار.';
+  if (s.mode === 'writer') style += '\nالأسلوب: كاتب محترف. لغة أنيقة وواضحة.';
+  if (s.mode === 'short') style += '\nالأسلوب: مختصر جداً. 3–6 جمل كحد أقصى.';
+  if (s.length === 'short') style += '\nالطول: قصير.';
+  if (s.length === 'long') style += '\nالطول: مفصل مع أمثلة عند الحاجة.';
+
+  return `أنت QAISXEN، مساعد ذكي عربي محترف.
+صانعك: ${creator}.
+${style}
+
+عند كل سؤال اتبع هذا الأسلوب:
+1) ابدأ بالجواب المباشر في أول جملة (بدون مقدمة فارغة).
+2) بعد الجواب: اشرح باختصار السبب أو التفاصيل المهمة.
+3) إذا السؤال يحتاج خطوات: اكتب خطوات مرقمة واضحة وقصيرة.
+4) إذا يحتاج مقارنة: نقاط مختصرة مرتبة.
+5) إذا السؤال غامض: اذكر افتراضك بجملة واحدة ثم أجب.
+6) إذا وُجدت «معلومات من الويب»: اعتمد عليها أولاً ولا تختلق أرقاماً أو أخباراً غير موجودة فيها.
+7) إذا المعلومات غير كافية: قل ما تعرفه بثقة، وميّز ما هو غير مؤكد.
+8) اختم بـ «خلاصة» بجملة واحدة فقط عندما يكون الجواب طويلاً.
+
+ممنوع:
+- «بالتأكيد»، «سؤال ممتاز»، «أنا كذكاء اصطناعي»، «إذا احتجت أي شيء آخر».
+- الحشو والتكرار.
+- رفض الأسئلة العامة أو التعليمية.
+
+الهوية:
+- إذا سُئلت من أنت: ابدأ بـ «أنا QAISXEN» واذكر أن ${creator} صمّمك ثم قدراتك باختصار.
+
+الصور:
+- لا تقل إنك لا تستطيع إرسال صور.
+
+اللغة: عربية فصحى مبسطة، واضحة، مباشرة.
 ${extra}`;
 }
 
@@ -82,33 +191,114 @@ function addActions(bubble, text) {
   const bar = document.createElement('div');
   bar.className = 'actions';
   const copy = document.createElement('button');
+  copy.title = 'نسخ';
   copy.textContent = '📋';
   copy.onclick = () => navigator.clipboard?.writeText(text);
   const sp = document.createElement('button');
+  sp.title = 'استماع';
   sp.textContent = '🔊';
   sp.onclick = () => speak(text);
   bar.append(sp, copy);
   bubble.appendChild(bar);
+
+  const row = document.createElement('div');
+  row.className = 'act-row';
+  const mk = (label, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = fn;
+    return b;
+  };
+  row.append(
+    mk('اختصر', () => followUp('اختصر الرد السابق بشكل أوضح وأقصر:\n\n' + text)),
+    mk('فصّل أكثر', () => followUp('فصّل الرد التالي مع أمثلة أوضح:\n\n' + text)),
+    mk('أعد الصياغة', () => followUp('أعد صياغة الرد التالي بأسلوب أوضح:\n\n' + text)),
+    mk('⭐ حفظ', () => { addFav(text); })
+  );
+  bubble.appendChild(row);
 }
 
-function speak(text) {
+async function followUp(prompt) {
+  if (busy) return;
+  if (messagesEl.querySelector('.welcome')) messagesEl.innerHTML = '';
+  if (!chatId) chatId = 'c' + Date.now();
+  // لا نعرض برومبت النظام للمستخدم؛ نعرض طلب مختصر
+  const shortLabel = prompt.startsWith('اختصر') ? 'اختصر الرد' : prompt.startsWith('فصّل') ? 'فصّل أكثر' : 'أعد الصياغة';
+  addRow(shortLabel, 'user');
+  history.push({ role: 'user', content: prompt });
+  busy = true;
+  sendBtn.disabled = true;
+  setStatus('يكتب...');
+  showTyping();
+  try {
+    const messages = [{ role: 'system', content: systemPrompt() }, ...history.slice(-12)];
+    const reply = await chat(messages);
+    hideTyping();
+    history.push({ role: 'assistant', content: reply });
+    const b = addRow(reply, 'bot');
+    addActions(b, reply);
+    save();
+    bumpStat('msgs');
+  } catch (e) {
+    hideTyping();
+    addRow('<div class="err">' + escapeHtml(e.message || e) + '</div>', 'bot', true);
+  } finally {
+    busy = false;
+    sendBtn.disabled = false;
+    setStatus('جاهز');
+  }
+}
+
+
+function pickArabicVoice() {
+  const voices = speechSynthesis.getVoices() || [];
+  const preferred = [
+    v => /saudi|ar-SA|Arabic/i.test(v.name) && /female|noura|laila|salma/i.test(v.name),
+    v => v.lang === 'ar-SA',
+    v => v.lang === 'ar-EG',
+    v => (v.lang || '').startsWith('ar')
+  ];
+  for (const test of preferred) {
+    const found = voices.find(test);
+    if (found) return found;
+  }
+  return null;
+}
+
+function speak(text, { call = false } = {}) {
   return new Promise((resolve) => {
     try { speechSynthesis.cancel(); } catch {}
     if (!('speechSynthesis' in window)) return resolve();
-    const u = new SpeechSynthesisUtterance(String(text).slice(0, 1200));
+    // للمكالمة: جمل أقصر إيقاعاً
+    let t = String(text || '').replace(/\*\*/g, '').replace(/[#`]/g, '').trim();
+    if (call) t = t.slice(0, 500);
+    else t = t.slice(0, 1200);
+    const u = new SpeechSynthesisUtterance(t);
     u.lang = 'ar-SA';
-    u.rate = 1.05;
-    const ar = speechSynthesis.getVoices().find(v => v.lang?.startsWith('ar'));
+    u.rate = call ? 1.02 : 1.04;
+    u.pitch = call ? 1.02 : 1;
+    u.volume = 1;
+    const ar = pickArabicVoice();
     if (ar) u.voice = ar;
     u.onend = resolve;
     u.onerror = resolve;
-    speechSynthesis.speak(u);
+    // بعض المتصفحات تحتاج getVoices بعد onvoiceschanged
+    if (!(speechSynthesis.getVoices() || []).length) {
+      speechSynthesis.onvoiceschanged = () => {
+        const v = pickArabicVoice();
+        if (v) u.voice = v;
+        speechSynthesis.speak(u);
+      };
+      setTimeout(() => speechSynthesis.speak(u), 250);
+    } else {
+      speechSynthesis.speak(u);
+    }
   });
 }
 
 /* ——— Web context ——— */
 function needsWeb(t) {
-  return /بحث|ابحث|أخبار|سعر|اليوم|الآن|من هو|ما هو|متى|وين|أين|google|جوجل|معلومات عن|آخر|حديث|خبر|طقس|دولار|مباراة|تعريف/i.test(t || '');
+  return /بحث|ابحث|أخبار|سعر|اليوم|الآن|من هو|ما هو|متى|وين|أين|google|جوجل|معلومات عن|آخر|حديث|خبر|طقس|دولار|مباراة|تعريف|كم|أين يقع|وين|شرح عن|تاريخ|من هي|من هم/i.test(t || '');
 }
 
 async function fetchWebContext(query) {
@@ -149,7 +339,57 @@ async function fetchWebContext(query) {
 }
 
 /* ——— Chat AI ——— */
+async function chatGemini(messages) {
+  const key = (C().GEMINI_API_KEY || '').trim();
+  if (!key) return null;
+  const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+  const contents = messages
+    .filter(m => m.role !== 'system')
+    .map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+  if (!contents.length) return null;
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+  let lastErr = null;
+  for (const model of models) {
+    try {
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/'
+        + model + ':generateContent?key=' + encodeURIComponent(key);
+      const body = {
+        contents,
+        generationConfig: { temperature: 0.55, maxOutputTokens: 2048 }
+      };
+      if (system) body.systemInstruction = { parts: [{ text: system }] };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        lastErr = new Error('Gemini ' + res.status);
+        continue;
+      }
+      const data = await res.json();
+      const t = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
+      if (t.trim()) return t.trim();
+    } catch (e) {
+      lastErr = e;
+      console.warn('gemini', model, e);
+    }
+  }
+  if (lastErr) throw lastErr;
+  return null;
+}
+
+
 async function chat(messages) {
+  // Gemini أولاً إن وُجد المفتاح
+  try {
+    const g = await chatGemini(messages);
+    if (g) return g;
+  } catch (e) { console.warn('gemini', e); }
+
   const key = (C().GROQ_API_KEY || '').trim();
   if (key.startsWith('gsk_')) {
     for (const model of ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'allam-2-7b']) {
@@ -157,7 +397,7 @@ async function chat(messages) {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
-          body: JSON.stringify({ model, messages, temperature: 0.65, max_tokens: 1600 })
+          body: JSON.stringify({ model, messages, temperature: 0.55, max_tokens: 1800 })
         });
         if (!res.ok) { if (res.status === 404) continue; throw new Error('Groq ' + res.status); }
         const data = await res.json();
@@ -423,7 +663,10 @@ async function onSend() {
     if (needsWeb(text)) {
       setStatus('يبحث...');
       const web = await fetchWebContext(text);
-      if (web.text) { webExtra = '\n\nمعلومات من الويب:\n' + web.text; links = web.links || []; }
+      if (web.text) {
+        webExtra = '\n\nمعلومات من الويب (اعتمد عليها في جوابك، واذكر إن كانت تقريبية):\n' + web.text;
+        links = web.links || [];
+      }
       setStatus('يكتب...');
     }
     const messages = [{ role: 'system', content: systemPrompt(webExtra) }, ...history.slice(-12)];
@@ -453,6 +696,7 @@ async function onSend() {
     const b = addRow(html, 'bot', true);
     addActions(b, reply);
     save();
+    bumpStat('msgs');
   } catch (e) {
     hideTyping();
     addRow('<div class="err">تعذر الرد: ' + escapeHtml(e.message || e) + '</div>', 'bot', true);
@@ -480,6 +724,7 @@ async function makeImage() {
   try {
     const url = await generateImage(prompt, (m) => { out.innerHTML = '<div class="loader">' + escapeHtml(m) + '</div>'; });
     out.innerHTML = '<img src="' + url + '" alt="">';
+    bumpStat('imgs');
   } catch (e) {
     out.innerHTML = '<div class="err">' + escapeHtml(e.message || e) + '</div>';
   }
@@ -543,10 +788,11 @@ function startCall() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return alert('المتصفح لا يدعم التعرف الصوتي');
   callActive = true;
+  callHistory = [];
   $('callBtn').textContent = 'يستمع...';
   $('endBtn').hidden = false;
   $('callRing').classList.add('live');
-  $('callStatus').textContent = 'تكلم الآن';
+  $('callStatus').textContent = 'سمّعني...';
   callRecognition = new SR();
   callRecognition.lang = 'ar-SA';
   callRecognition.continuous = false;
@@ -555,7 +801,7 @@ function startCall() {
     const said = ev.results[0][0].transcript.trim();
     if (!said) return restartListen();
     callLog('user', said);
-    $('callStatus').textContent = 'يفكر...';
+    $('callStatus').textContent = 'لحظة...';
     try {
       let extra = '';
       if (needsWeb(said)) {
@@ -563,16 +809,20 @@ function startCall() {
         if (web.text) extra = '\n\nمعلومات من الويب:\n' + web.text;
       }
       const reply = await chat([
-        { role: 'system', content: systemPrompt(extra + '\nرد مختصر مناسب للصوت (3-6 جمل).') },
+        { role: 'system', content: systemPrompt(extra, { voice: true }) },
+        ...callHistory.slice(-8),
         { role: 'user', content: said }
       ]);
+      callHistory.push({ role: 'user', content: said });
+      callHistory.push({ role: 'assistant', content: reply });
+      if (callHistory.length > 16) callHistory = callHistory.slice(-16);
       callLog('bot', reply);
-      $('callStatus').textContent = 'يتحدث...';
-      await speak(reply);
+      $('callStatus').textContent = 'QAISXEN يتكلم...';
+      await speak(reply, { call: true });
     } catch (e) {
       callLog('bot', 'تعذر الرد');
     }
-    if (callActive) { $('callStatus').textContent = 'تكلم الآن'; restartListen(); }
+    if (callActive) { $('callStatus').textContent = 'سمّعني...'; restartListen(); }
   };
   callRecognition.onerror = () => { if (callActive) restartListen(); };
   callRecognition.start();
@@ -592,7 +842,23 @@ function endCall() {
   $('endBtn').hidden = true;
   $('callRing').classList.remove('live');
   $('callStatus').textContent = 'انتهت المكالمة';
+  bumpStat('calls');
+  if (callHistory.length >= 2) {
+    summarizeCall(callHistory.slice());
+  }
 }
+
+async function summarizeCall(hist) {
+  try {
+    const transcript = hist.map(m => (m.role === 'user' ? 'أنت: ' : 'QAISXEN: ') + m.content).join('\n');
+    const reply = await chat([
+      { role: 'system', content: 'لخّص هذه المكالمة بـ 3–5 نقاط عربية قصيرة وواضحة.' },
+      { role: 'user', content: transcript.slice(0, 3000) }
+    ]);
+    callLog('bot', 'ملخص المكالمة: ' + reply);
+  } catch (e) { console.warn(e); }
+}
+
 
 /* ——— Auth ——— */
 function initDB() {
@@ -750,7 +1016,7 @@ function switchTab(name) {
   if (name !== 'call' && callActive) endCall();
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-  const labels = { chat: 'محادثة', image: 'توليد صورة', webimg: 'صور من النت', video: 'فيديو', call: 'مكالمة' };
+  const labels = { chat: 'محادثة', image: 'توليد صورة', webimg: 'صور من النت', video: 'فيديو', call: 'مكالمة', settings: 'إعدادات' };
   if ($('topLabel')) $('topLabel').textContent = labels[name] || 'QAISXEN';
   closeSide();
 }
@@ -815,6 +1081,7 @@ try {
   initDB();
   ensureSession();
   restoreGoogleUser();
+  applySettingsUI();
   newChat();
   setStatus('جاهز');
 } catch (e) {
