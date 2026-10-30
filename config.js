@@ -1,15 +1,20 @@
+// QAISXEN v1.0
+// أمان: بعد النشر قيّد GEMINI_API_KEY على نطاق موقعك من Google Cloud / AI Studio
+// Groq لا يدعم تقييد النطاق بنفس الطريقة — راقب الاستخدام أو انقل المفتاح لسيرفر لاحقاً
 window.QAISXEN_CONFIG = {
   SITE_NAME: 'QAISXEN',
   CREATOR: 'قيس',
+  VERSION: '1.0',
 
   GROQ_API_KEY: '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',
 
-  // Google Gemini
+  // Google Gemini — قيّده بـ HTTP referrers على دومينك
   GEMINI_API_KEY: 'AIzaSyAPr-NyiR8_og8qBmk3CbqkdEvAC2PMMrU',
 
   HF_TOKEN: '',
   POLLINATIONS_KEY: '',
 
+  // OAuth Web Client ID (لصفحة login.html) — أضف origins المسموحة في Google Cloud
   GOOGLE_CLIENT_ID: '',
 
   SUPABASE_URL: 'https://jcorezrkteubzmzmosbj.supabase.co',

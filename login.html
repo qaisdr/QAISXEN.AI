@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>تسجيل الدخول · QAISXEN</title>
+  <link rel="icon" href="logo-app.svg" type="image/svg+xml" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg: #05080F; --card: rgba(12,18,32,.92); --line: rgba(148,163,184,.14);
+      --text: #F8FAFC; --muted: #94A3B8; --cyan: #22D3EE; --violet: #A78BFA;
+      --font: 'Cairo', system-ui, sans-serif; --display: 'Montserrat', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; font-family: var(--font); color: var(--text);
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; position: relative; overflow: hidden;
+    }
+    body::before, body::after {
+      content: ''; position: fixed; border-radius: 50%; filter: blur(80px); z-index: 0;
+    }
+    body::before {
+      width: 50vmax; height: 50vmax; top: -20%; right: -15%;
+      background: radial-gradient(circle, rgba(34,211,238,.35), transparent 70%);
+    }
+    body::after {
+      width: 45vmax; height: 45vmax; bottom: -20%; left: -15%;
+      background: radial-gradient(circle, rgba(167,139,250,.3), transparent 70%);
+    }
+    .card {
+      position: relative; z-index: 1; width: 100%; max-width: 420px;
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 24px; padding: 36px 28px 28px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 30px 80px rgba(0,0,0,.45);
+      text-align: center;
+    }
+    .logo {
+      width: 72px; height: 72px; border-radius: 20px; margin-bottom: 16px;
+      box-shadow: 0 0 0 1px rgba(34,211,238,.25), 0 16px 40px rgba(34,211,238,.2);
+    }
+    h1 {
+      font-family: var(--display); font-size: 22px; letter-spacing: .12em;
+      background: linear-gradient(100deg, var(--cyan), #fff 45%, var(--violet));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .sub { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 24px; }
+    #googleBtn {
+      display: flex; justify-content: center; min-height: 48px; margin: 8px 0 16px;
+    }
+    .hint {
+      font-size: 12px; color: var(--muted); line-height: 1.6;
+      background: rgba(34,211,238,.06); border: 1px solid var(--line);
+      border-radius: 14px; padding: 12px 14px; text-align: right; margin-top: 8px;
+    }
+    .hint code {
+      color: var(--cyan); font-size: 11px; word-break: break-all;
+    }
+    .err {
+      display: none; margin-top: 12px; color: #FCA5A5; font-size: 13px;
+      background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.3);
+      border-radius: 12px; padding: 10px 12px;
+    }
+    .err.show { display: block; }
+    .back {
+      display: inline-block; margin-top: 18px; color: var(--cyan);
+      text-decoration: none; font-size: 13px; font-weight: 600;
+    }
+    .back:hover { text-decoration: underline; }
+    .user-box { display: none; margin-top: 8px; }
+    .user-box.show { display: block; }
+    .user-box img {
+      width: 56px; height: 56px; border-radius: 50%; margin-bottom: 10px;
+      border: 2px solid rgba(34,211,238,.35);
+    }
+    .user-box .name { font-weight: 700; margin-bottom: 4px; }
+    .user-box .email { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+    .btn {
+      border: none; border-radius: 14px; padding: 12px 18px; cursor: pointer;
+      font-family: var(--font); font-weight: 700; font-size: 14px;
+      background: linear-gradient(135deg, #22D3EE, #A78BFA); color: #041016;
+      width: 100%; margin-top: 6px;
+    }
+    .btn.ghost {
+      background: transparent; color: var(--muted); border: 1px solid var(--line);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="logo-app.svg" alt="QAISXEN" />
+    <h1>QAISXEN</h1>
+    <p class="sub">سجّل الدخول بحساب Google للمتابعة</p>
+
+    <div id="loginPane">
+      <div id="googleBtn"></div>
+      <div class="hint" id="setupHint" hidden>
+        لتفعيل الزر الرسمي: ضع <code>GOOGLE_CLIENT_ID</code> في <code>config.js</code>
+        من Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID (Web).
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+
+    <div class="user-box" id="userPane">
+      <img id="uPic" alt="" />
+      <div class="name" id="uName"></div>
+      <div class="email" id="uEmail"></div>
+      <button class="btn" onclick="goApp()">دخول إلى QAISXEN</button>
+      <button class="btn ghost" onclick="logout()">تسجيل الخروج</button>
+    </div>
+
+    <a class="back" href="index.html">← العودة بدون تسجيل</a>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    const C = () => window.QAISXEN_CONFIG || {};
+    const errEl = document.getElementById('err');
+    function showErr(m) {
+      errEl.textContent = m || '';
+      errEl.classList.toggle('show', !!m);
+    }
+
+    function saveUser(profile) {
+      localStorage.setItem('qx-google', JSON.stringify(profile));
+    }
+
+    function readUser() {
+      try { return JSON.parse(localStorage.getItem('qx-google') || 'null'); } catch { return null; }
+    }
+
+    function showLoggedIn(profile) {
+      document.getElementById('loginPane').style.display = 'none';
+      document.getElementById('userPane').classList.add('show');
+      document.getElementById('uName').textContent = profile.name || 'مستخدم Google';
+      document.getElementById('uEmail').textContent = profile.email || '';
+      const pic = document.getElementById('uPic');
+      if (profile.picture) {
+        pic.src = profile.picture;
+        pic.style.display = 'inline-block';
+      } else {
+        pic.style.display = 'none';
+      }
+    }
+
+    function onGoogleCredential(resp) {
+      try {
+        const payload = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const profile = {
+          name: payload.name || payload.email,
+          email: payload.email,
+          picture: payload.picture || '',
+          sub: payload.sub
+        };
+        saveUser(profile);
+        showLoggedIn(profile);
+        showErr('');
+      } catch (e) {
+        showErr('فشل تسجيل الدخول عبر Google');
+      }
+    }
+
+    function goApp() { location.href = 'index.html'; }
+    function logout() {
+      localStorage.removeItem('qx-google');
+      try { google.accounts.id.disableAutoSelect(); } catch {}
+      location.reload();
+    }
+
+    function initGoogle() {
+      const clientId = (C().GOOGLE_CLIENT_ID || '').trim();
+      const existing = readUser();
+      if (existing && existing.email) {
+        showLoggedIn(existing);
+        return;
+      }
+      if (!clientId) {
+        document.getElementById('setupHint').hidden = false;
+        showErr('GOOGLE_CLIENT_ID غير مضاف في config.js');
+        return;
+      }
+      if (!window.google?.accounts?.id) {
+        setTimeout(initGoogle, 400);
+        return;
+      }
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: onGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
+      google.accounts.id.renderButton(document.getElementById('googleBtn'), {
+        theme: 'outline',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: 320,
+        logo_alignment: 'left'
+      });
+      // One Tap optional
+      try {
+        google.accounts.id.prompt();
+      } catch {}
+    }
+
+    initGoogle();
+  </script>
+</body>
+</html>

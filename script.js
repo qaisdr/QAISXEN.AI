@@ -110,13 +110,20 @@ function format(text) {
 function systemPrompt(extra = '', { voice = false } = {}) {
   const creator = C().CREATOR || 'قيس';
   if (voice) {
-    return `أنت QAISXEN في مكالمة صوتية مباشرة.
+    return `أنت QAISXEN في مكالمة هاتفية حقيقية مع صديق.
 صانعك: ${creator}.
-- رد كإنسان على الهاتف: طبيعي ومختصر (1–4 جمل).
-- لا تعداد طويل ولا Markdown.
-- لا حشو مثل «بالتأكيد» أو «سؤال رائع».
-- اسأل سؤالاً واحداً فقط إذا لزم.
-- إذا سُئلت من أنت: «أنا QAISXEN، مساعد صمّمه ${creator}».
+
+طريقة الحكي (إلزامي):
+- احكِ عامية بيضاء قريبة من الناس، مش لغة كتب.
+- رد قصير: جملة إلى ثلاث جمل غالباً. نادراً أربع.
+- ابدأ أحياناً بتفاعل طبيعي مثل: طيب، يعني، فهمتك، هيه، أوكي — بدون مبالغة.
+- جاوب على السؤال أولاً، بعدين جملة توضيح إن لزم.
+- اسأل سؤال متابعة واحد فقط إذا ساعد الحوار.
+- إذا ما سمعت كويس: «عفواً، ممكن تعيد؟»
+- إذا سُئلت من أنت: «أنا QAISXEN، مساعد صمّمه ${creator}.»
+- ممنوع تماماً: تعداد، نجوم، عناوين، «بالتأكيد»، «سؤال رائع»، «كذكاء اصطناعي»، «هل تريد المزيد».
+- ممنوع الفصحى الثقيلة والجمل الطويلة المعقدة.
+- احكِ كأنك على واتساب كول أو اتصال عادي.
 ${extra}`;
   }
   const s = loadSettings();
@@ -245,7 +252,7 @@ async function followUp(prompt) {
   } finally {
     busy = false;
     sendBtn.disabled = false;
-    setStatus('جاهز');
+    setStatus((C().VERSION ? ('v' + C().VERSION + ' · ') : '') + 'جاهز');
   }
 }
 
@@ -265,34 +272,74 @@ function pickArabicVoice() {
   return null;
 }
 
+function humanizeForSpeech(text) {
+  let t = String(text || '');
+  t = t.replace(/\*\*/g, '').replace(/[`#*_]/g, '');
+  t = t.replace(/\n+/g, '، ');
+  t = t.replace(/\s*[-•]\s*/g, '، ');
+  t = t.replace(/\d+[\.)]\s*/g, '');
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  // توقفات أوضح للكلام
+  t = t.replace(/([.!?؟])\s*/g, '$1 ');
+  return t;
+}
+
 function speak(text, { call = false } = {}) {
   return new Promise((resolve) => {
     try { speechSynthesis.cancel(); } catch {}
     if (!('speechSynthesis' in window)) return resolve();
-    // للمكالمة: جمل أقصر إيقاعاً
-    let t = String(text || '').replace(/\*\*/g, '').replace(/[#`]/g, '').trim();
-    if (call) t = t.slice(0, 500);
+    let t = humanizeForSpeech(text);
+    if (call) t = t.slice(0, 420);
     else t = t.slice(0, 1200);
+    if (!t) return resolve();
+
+    // للمكالمة: قسّم لجمل قصيرة أكثر طبيعية
+    if (call) {
+      const parts = t.split(/(?<=[.!?؟،])\s+/).map(s => s.trim()).filter(Boolean);
+      const chunks = [];
+      let buf = '';
+      for (const p of parts) {
+        if ((buf + ' ' + p).trim().length > 140) {
+          if (buf) chunks.push(buf.trim());
+          buf = p;
+        } else buf = (buf + ' ' + p).trim();
+      }
+      if (buf) chunks.push(buf.trim());
+      const queue = chunks.slice(0, 6);
+      let i = 0;
+      const next = () => {
+        if (i >= queue.length) return resolve();
+        const u = new SpeechSynthesisUtterance(queue[i++]);
+        u.lang = 'ar-SA';
+        u.rate = 0.98;
+        u.pitch = 1.05;
+        u.volume = 1;
+        const ar = pickArabicVoice();
+        if (ar) u.voice = ar;
+        u.onend = () => setTimeout(next, 120);
+        u.onerror = () => setTimeout(next, 80);
+        speechSynthesis.speak(u);
+      };
+      if (!(speechSynthesis.getVoices() || []).length) {
+        speechSynthesis.onvoiceschanged = () => next();
+        setTimeout(next, 300);
+      } else next();
+      return;
+    }
+
     const u = new SpeechSynthesisUtterance(t);
     u.lang = 'ar-SA';
-    u.rate = call ? 1.02 : 1.04;
-    u.pitch = call ? 1.02 : 1;
+    u.rate = 1.02;
+    u.pitch = 1;
     u.volume = 1;
     const ar = pickArabicVoice();
     if (ar) u.voice = ar;
     u.onend = resolve;
     u.onerror = resolve;
-    // بعض المتصفحات تحتاج getVoices بعد onvoiceschanged
     if (!(speechSynthesis.getVoices() || []).length) {
-      speechSynthesis.onvoiceschanged = () => {
-        const v = pickArabicVoice();
-        if (v) u.voice = v;
-        speechSynthesis.speak(u);
-      };
+      speechSynthesis.onvoiceschanged = () => speechSynthesis.speak(u);
       setTimeout(() => speechSynthesis.speak(u), 250);
-    } else {
-      speechSynthesis.speak(u);
-    }
+    } else speechSynthesis.speak(u);
   });
 }
 
@@ -776,72 +823,147 @@ async function handleUpload(ev) {
 }
 
 /* ——— Call ——— */
+let callBusy = false;
+
 function callLog(role, text) {
+  const box = $('callLog');
+  if (!box) return;
   const item = document.createElement('div');
   item.className = 'item ' + role;
   item.textContent = (role === 'user' ? 'أنت: ' : 'QAISXEN: ') + text;
-  $('callLog').appendChild(item);
-  $('callLog').scrollTop = $('callLog').scrollHeight;
+  box.appendChild(item);
+  box.scrollTop = box.scrollHeight;
 }
-function toggleCall() { callActive ? endCall() : startCall(); }
+
+function toggleCall() {
+  if (callActive) endCall();
+  else startCall();
+}
+
 function startCall() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return alert('المتصفح لا يدعم التعرف الصوتي');
+  if (!SR) {
+    alert('المتصفح لا يدعم المكالمة الصوتية. استخدم Chrome.');
+    return;
+  }
   callActive = true;
+  callBusy = false;
   callHistory = [];
-  $('callBtn').textContent = 'يستمع...';
-  $('endBtn').hidden = false;
-  $('callRing').classList.add('live');
-  $('callStatus').textContent = 'سمّعني...';
+  if ($('callLog')) $('callLog').innerHTML = '';
+  if ($('callBtn')) $('callBtn').textContent = 'جارية...';
+  if ($('endBtn')) $('endBtn').hidden = false;
+  if ($('callRing')) $('callRing').classList.add('live');
+  if ($('callStatus')) $('callStatus').textContent = 'سمّعني...';
+
   callRecognition = new SR();
   callRecognition.lang = 'ar-SA';
   callRecognition.continuous = false;
   callRecognition.interimResults = false;
+  callRecognition.maxAlternatives = 1;
+
   callRecognition.onresult = async (ev) => {
-    const said = ev.results[0][0].transcript.trim();
-    if (!said) return restartListen();
+    if (!callActive || callBusy) return;
+    const said = (ev.results?.[0]?.[0]?.transcript || '').trim();
+    if (!said) {
+      scheduleListen(300);
+      return;
+    }
+    callBusy = true;
+    try { callRecognition.stop(); } catch {}
     callLog('user', said);
-    $('callStatus').textContent = 'لحظة...';
+    if ($('callStatus')) $('callStatus').textContent = 'لحظة...';
     try {
       let extra = '';
       if (needsWeb(said)) {
         const web = await fetchWebContext(said);
         if (web.text) extra = '\n\nمعلومات من الويب:\n' + web.text;
       }
-      const reply = await chat([
+      const messages = [
         { role: 'system', content: systemPrompt(extra, { voice: true }) },
         ...callHistory.slice(-8),
-        { role: 'user', content: said }
-      ]);
+        { role: 'user', content: said + '\n\n(ردّ عليّ كأنه اتصال صوتي قصير وطبيعي)' }
+      ];
+      let reply = await chat(messages);
+      // تنظيف أي بقايا نص غير صوتي
+      reply = String(reply || '')
+        .replace(/^QAISXEN\s*:\s*/i, '')
+        .replace(/\*\*/g, '')
+        .replace(/^[-•]\s+/gm, '')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
       callHistory.push({ role: 'user', content: said });
       callHistory.push({ role: 'assistant', content: reply });
       if (callHistory.length > 16) callHistory = callHistory.slice(-16);
       callLog('bot', reply);
-      $('callStatus').textContent = 'QAISXEN يتكلم...';
+      if ($('callStatus')) $('callStatus').textContent = 'QAISXEN يتكلم...';
       await speak(reply, { call: true });
     } catch (e) {
-      callLog('bot', 'تعذر الرد');
+      console.warn(e);
+      callLog('bot', 'تعذر الرد، حاول مرة ثانية');
     }
-    if (callActive) { $('callStatus').textContent = 'سمّعني...'; restartListen(); }
+    callBusy = false;
+    if (callActive) {
+      if ($('callStatus')) $('callStatus').textContent = 'سمّعني...';
+      scheduleListen(350);
+    }
   };
-  callRecognition.onerror = () => { if (callActive) restartListen(); };
-  callRecognition.start();
+
+  callRecognition.onerror = (ev) => {
+    const err = ev.error || '';
+    console.warn('speech error', err);
+    if (!callActive) return;
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
+      if ($('callStatus')) $('callStatus').textContent = 'اسمح بالمايكروفون من المتصفح';
+      endCall();
+      return;
+    }
+    if (err === 'no-speech' || err === 'aborted' || err === 'audio-capture') {
+      if (!callBusy) scheduleListen(400);
+      return;
+    }
+    if (!callBusy) scheduleListen(500);
+  };
+
+  callRecognition.onend = () => {
+    // إذا ما في معالجة جارية أعد الاستماع
+    if (callActive && !callBusy) scheduleListen(300);
+  };
+
+  scheduleListen(200);
 }
+
+function scheduleListen(delay) {
+  if (!callActive || callBusy || !callRecognition) return;
+  setTimeout(() => {
+    if (!callActive || callBusy || !callRecognition) return;
+    try {
+      callRecognition.start();
+      if ($('callStatus')) $('callStatus').textContent = 'سمّعني...';
+    } catch (e) {
+      // Already started
+      setTimeout(() => {
+        if (!callActive || callBusy || !callRecognition) return;
+        try { callRecognition.start(); } catch {}
+      }, 500);
+    }
+  }, delay || 300);
+}
+
 function restartListen() {
-  if (!callActive || !callRecognition) return;
-  try { callRecognition.start(); } catch {
-    setTimeout(() => { try { callRecognition.start(); } catch {} }, 400);
-  }
+  scheduleListen(300);
 }
+
 function endCall() {
   callActive = false;
+  callBusy = false;
   try { callRecognition?.stop(); } catch {}
+  try { callRecognition?.abort(); } catch {}
   callRecognition = null;
   try { speechSynthesis.cancel(); } catch {}
-  $('callBtn').textContent = 'بدء';
-  $('endBtn').hidden = true;
-  $('callRing').classList.remove('live');
-  $('callStatus').textContent = 'انتهت المكالمة';
+  if ($('callBtn')) $('callBtn').textContent = 'بدء';
+  if ($('endBtn')) $('endBtn').hidden = true;
+  if ($('callRing')) $('callRing').classList.remove('live');
+  if ($('callStatus')) $('callStatus').textContent = 'انتهت المكالمة';
   bumpStat('calls');
   if (callHistory.length >= 2) {
     summarizeCall(callHistory.slice());
@@ -858,7 +980,6 @@ async function summarizeCall(hist) {
     callLog('bot', 'ملخص المكالمة: ' + reply);
   } catch (e) { console.warn(e); }
 }
-
 
 /* ——— Auth ——— */
 function initDB() {

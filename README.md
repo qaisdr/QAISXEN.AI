@@ -1,18 +1,18 @@
-# QAISXEN
+# QAISXEN v1.0
 
-مساعد ذكي عربي — محادثة، صور، فيديو.
+مساعد ذكي عربي — محادثة، صور، فيديو، مكالمة.
 
 ## تشغيل محلي
 ```bash
 python -m http.server 8000
 ```
-افتح http://localhost:8000
+http://localhost:8000
 
-## الإعداد
-عدّل `config.js`:
-- GROQ_API_KEY للردود
-- HF_TOKEN أو POLLINATIONS_KEY للصور
-- SUPABASE_* لحفظ سحابي خاص
+## نشر
+ارفع محتويات المجلد إلى Netlify (Drag & drop).
 
-## النشر
-انظر DEPLOY.md
+## تسجيل Google
+افتح login.html بعد إضافة GOOGLE_CLIENT_ID — انظر SECURITY.md
+
+## الحماية
+اتبع SECURITY.md لتقييد مفاتيح Google قبل الانتشار.

@@ -25,7 +25,7 @@
         <img src="logo-app.svg" width="40" height="40" alt="" />
         <div>
           <strong>QAISXEN</strong>
-          <small>Beta v1.0</small>
+          <small>by قيس</small>
         </div>
       </div>
       <button class="btn-new" onclick="newChat()">+ جديد</button>
@@ -40,7 +40,8 @@
       <div class="hist-title">السجل</div>
       <div class="hist" id="hist"></div>
       <div class="side-user" id="sideUser">
-        <button class="btn-ghost" onclick="showAuth()">تسجيل الدخول</button>
+        <a class="btn-ghost" href="login.html" style="text-align:center;text-decoration:none;display:block">تسجيل Google</a>
+        <button class="btn-ghost" onclick="showAuth()">بريد / حساب</button>
       </div>
       <button class="btn-ghost" onclick="clearHistory()">مسح السجل</button>
     </aside>
@@ -156,6 +157,7 @@
     <div class="auth-card">
       <img src="logo-app.svg" width="48" height="48" alt="" />
       <h2>تسجيل الدخول</h2>
+      <a href="login.html" class="linkish" style="display:block;margin-bottom:10px">صفحة Google الرسمية</a>
       <div id="googleBtnWrap" class="google-wrap"></div>
       <div class="or-line"><span>أو</span></div>
       <input type="email" id="authEmail" placeholder="البريد" />
